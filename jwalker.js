@@ -2,7 +2,7 @@
 
   const DIRS      = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   const GRID_SIZE = 8;
-  const FADE_MS   = 2000; // how long a stopped walker takes to disappear
+  const FADE_STEP = 0.008; // opacity delta per frame (~2s at 60fps)
 
   class Walker {
     constructor(canvas, { x, y, color, speed, length }) {
@@ -12,7 +12,7 @@
       this.speed   = speed;
       this.length  = length;
       this.stopped = false;
-      this.fadeAge = 0; // ms since stopped
+      this.opacity = 0; // fades in from 0
 
       this.col = Math.floor(x / GRID_SIZE);
       this.row = Math.floor(y / GRID_SIZE);
@@ -44,44 +44,41 @@
           const tail = this.trail.shift();
           this.occupied.delete(`${tail.col},${tail.row}`);
         }
-        return true; // moved
+        return true;
       }
-      return false; // trapped
+      return false;
     }
 
     update(dt) {
       if (this.stopped) {
-        this.fadeAge += dt;
+        this.opacity -= FADE_STEP;
         return;
       }
+
+      // Fade in
+      if (this.opacity < 1) this.opacity = Math.min(1, this.opacity + FADE_STEP);
 
       this._elapsed += dt;
       const interval = 1000 / this.speed;
       while (this._elapsed >= interval) {
         this._elapsed -= interval;
-        const moved = this.step();
-        if (!moved) {
+        if (!this.step()) {
           this.stopped = true;
-          this.fadeAge = dt; // begin fade immediately with this frame's dt
           return;
         }
       }
     }
 
-    // Returns true while still visible
     get alive() {
-      return !this.stopped || this.fadeAge < FADE_MS;
+      return this.opacity > 0;
     }
 
     draw(ctx) {
       const s = this.size;
       const n = this.trail.length;
-      const fadeAlpha = this.stopped ? 1 - (this.fadeAge / FADE_MS) : 1;
-
       for (let i = 0; i < n; i++) {
         const { col, row } = this.trail[i];
-        const trailAlpha = (i + 1) / n;
-        ctx.globalAlpha = trailAlpha * fadeAlpha;
+        ctx.globalAlpha = ((i + 1) / n) * this.opacity;
         ctx.fillStyle = this.color;
         ctx.fillRect(col * s + 1, row * s + 1, s - 1, s - 1);
       }
@@ -90,7 +87,7 @@
   }
 
   function randomColor() {
-    const l = 30 + Math.floor(Math.random() * 35); // 30–65%, dim enough not to compete with text
+    const l = 30 + Math.floor(Math.random() * 35);
     return `hsl(0, 0%, ${l}%)`;
   }
 
@@ -128,10 +125,10 @@
       const dt = last === null ? 0 : ts - last;
       last = ts;
 
-      // Cull fully faded walkers, then spawn to keep N moving
-      const alive   = walkers.filter(w => w.alive);
-      const moving  = alive.filter(w => !w.stopped).length;
-      const needed  = N - moving;
+      // Cull dead walkers, spawn to keep N moving
+      const alive  = walkers.filter(w => w.alive);
+      const moving = alive.filter(w => !w.stopped).length;
+      const needed = N - moving;
       for (let i = 0; i < needed; i++) alive.push(randomWalker(canvas));
       walkers = alive;
 
