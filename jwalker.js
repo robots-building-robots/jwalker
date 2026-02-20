@@ -1,74 +1,86 @@
 (function () {
 
-  const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const DIRS      = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const GRID_SIZE = 8;
+  const FADE_MS   = 2000; // how long a stopped walker takes to disappear
 
   class Walker {
-    constructor(canvas, { x, y, size, color, speed, length }) {
-      this.canvas = canvas;
-      this.size   = size;    // grid cell size in px
-      this.color  = color;
-      this.speed  = speed;   // steps per second
-      this.length = length;  // max trail length in cells
+    constructor(canvas, { x, y, color, speed, length }) {
+      this.canvas  = canvas;
+      this.size    = GRID_SIZE;
+      this.color   = color;
+      this.speed   = speed;
+      this.length  = length;
+      this.stopped = false;
+      this.fadeAge = 0; // ms since stopped
 
-      // Snap starting position to grid
-      this.col = Math.floor(x / size);
-      this.row = Math.floor(y / size);
+      this.col = Math.floor(x / GRID_SIZE);
+      this.row = Math.floor(y / GRID_SIZE);
 
       this.trail    = [{ col: this.col, row: this.row }];
       this.occupied = new Set([`${this.col},${this.row}`]);
-
       this._elapsed = 0;
     }
 
     step() {
-      // Shuffle directions for unbiased random walk
       const dirs = DIRS.slice().sort(() => Math.random() - 0.5);
-
       const cols = Math.floor(this.canvas.width  / this.size);
       const rows = Math.floor(this.canvas.height / this.size);
 
       for (const [dc, dr] of dirs) {
-        const nc = this.col + dc;
-        const nr = this.row + dr;
+        const nc  = this.col + dc;
+        const nr  = this.row + dr;
         const key = `${nc},${nr}`;
 
         if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
         if (this.occupied.has(key)) continue;
 
-        // Move to the new cell
         this.col = nc;
         this.row = nr;
         this.trail.push({ col: nc, row: nr });
         this.occupied.add(key);
 
-        // Drop the tail if over length
         if (this.trail.length > this.length) {
           const tail = this.trail.shift();
           this.occupied.delete(`${tail.col},${tail.row}`);
         }
-
-        return;
+        return true; // moved
       }
-      // All neighbours occupied — wait (trail will free space next step)
+      return false; // trapped
     }
 
     update(dt) {
+      if (this.stopped) {
+        this.fadeAge += dt;
+        return;
+      }
+
       this._elapsed += dt;
       const interval = 1000 / this.speed;
       while (this._elapsed >= interval) {
         this._elapsed -= interval;
-        this.step();
+        const moved = this.step();
+        if (!moved) {
+          this.stopped = true;
+          return;
+        }
       }
+    }
+
+    // Returns true while still visible
+    get alive() {
+      return !this.stopped || this.fadeAge < FADE_MS;
     }
 
     draw(ctx) {
       const s = this.size;
       const n = this.trail.length;
+      const fadeAlpha = this.stopped ? 1 - (this.fadeAge / FADE_MS) : 1;
+
       for (let i = 0; i < n; i++) {
         const { col, row } = this.trail[i];
-        // Fade opacity from tail to head
-        const alpha = (i + 1) / n;
-        ctx.globalAlpha = alpha;
+        const trailAlpha = (i + 1) / n;
+        ctx.globalAlpha = trailAlpha * fadeAlpha;
         ctx.fillStyle = this.color;
         ctx.fillRect(col * s + 1, row * s + 1, s - 1, s - 1);
       }
@@ -76,10 +88,8 @@
     }
   }
 
-  const GRID_SIZE = 8;
-
   function randomColor() {
-    const l = 40 + Math.floor(Math.random() * 55);
+    const l = 30 + Math.floor(Math.random() * 35); // 30–65%, dim enough not to compete with text
     return `hsl(0, 0%, ${l}%)`;
   }
 
@@ -87,7 +97,6 @@
     return new Walker(canvas, {
       x:      Math.random() * canvas.width,
       y:      Math.random() * canvas.height,
-      size:   GRID_SIZE,
       color:  randomColor(),
       speed:  4 + Math.random() * 8,
       length: 20 + Math.floor(Math.random() * 40),
@@ -118,9 +127,15 @@
       const dt = last === null ? 0 : ts - last;
       last = ts;
 
+      // Replace dead walkers, maintaining N active
+      const active = walkers.filter(w => w.alive);
+      const stopped = active.filter(w => w.stopped).length;
+      const needed  = N - (active.length - stopped);
+      for (let i = 0; i < needed; i++) active.push(randomWalker(canvas));
+      walkers = active;
+
       const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       walkers.forEach(w => { w.update(dt); w.draw(ctx); });
       requestAnimationFrame(loop);
     }
