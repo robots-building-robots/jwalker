@@ -1,55 +1,78 @@
 (function () {
 
+  const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
   class Walker {
     constructor(canvas, { x, y, size, color, speed, length }) {
       this.canvas = canvas;
-      this.x = x;
-      this.y = y;
-      this.size = size;
-      this.color = color;
-      this.speed = speed;
-      this.length = length;
-      this.trail = [];
-      this.angle = Math.random() * Math.PI * 2;
+      this.size   = size;    // grid cell size in px
+      this.color  = color;
+      this.speed  = speed;   // steps per second
+      this.length = length;  // max trail length in cells
+
+      // Snap starting position to grid
+      this.col = Math.floor(x / size);
+      this.row = Math.floor(y / size);
+
+      this.trail    = [{ col: this.col, row: this.row }];
+      this.occupied = new Set([`${this.col},${this.row}`]);
+
+      this._elapsed = 0;
     }
 
-    update() {
-      // Randomly nudge direction
-      this.angle += (Math.random() - 0.5) * 0.4;
+    step() {
+      // Shuffle directions for unbiased random walk
+      const dirs = DIRS.slice().sort(() => Math.random() - 0.5);
 
-      this.x += Math.cos(this.angle) * this.speed;
-      this.y += Math.sin(this.angle) * this.speed;
+      const cols = Math.floor(this.canvas.width  / this.size);
+      const rows = Math.floor(this.canvas.height / this.size);
 
-      // Bounce off edges
-      const w = this.canvas.width;
-      const h = this.canvas.height;
-      if (this.x < 0 || this.x > w) { this.angle = Math.PI - this.angle; this.x = Math.max(0, Math.min(w, this.x)); }
-      if (this.y < 0 || this.y > h) { this.angle = -this.angle;           this.y = Math.max(0, Math.min(h, this.y)); }
+      for (const [dc, dr] of dirs) {
+        const nc = this.col + dc;
+        const nr = this.row + dr;
+        const key = `${nc},${nr}`;
 
-      this.trail.push({ x: this.x, y: this.y });
-      if (this.trail.length > this.length) this.trail.shift();
+        if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
+        if (this.occupied.has(key)) continue;
+
+        // Move to the new cell
+        this.col = nc;
+        this.row = nr;
+        this.trail.push({ col: nc, row: nr });
+        this.occupied.add(key);
+
+        // Drop the tail if over length
+        if (this.trail.length > this.length) {
+          const tail = this.trail.shift();
+          this.occupied.delete(`${tail.col},${tail.row}`);
+        }
+
+        return;
+      }
+      // All neighbours occupied — wait (trail will free space next step)
+    }
+
+    update(dt) {
+      this._elapsed += dt;
+      const interval = 1000 / this.speed;
+      while (this._elapsed >= interval) {
+        this._elapsed -= interval;
+        this.step();
+      }
     }
 
     draw(ctx) {
-      if (this.trail.length < 2) return;
-
-      ctx.strokeStyle = this.color;
-      ctx.lineWidth = this.size;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      ctx.beginPath();
-      ctx.moveTo(this.trail[0].x, this.trail[0].y);
-      for (let i = 1; i < this.trail.length; i++) {
-        ctx.lineTo(this.trail[i].x, this.trail[i].y);
+      const s = this.size;
+      const n = this.trail.length;
+      for (let i = 0; i < n; i++) {
+        const { col, row } = this.trail[i];
+        // Fade opacity from tail to head
+        const alpha = (i + 1) / n;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = this.color;
+        ctx.fillRect(col * s + 1, row * s + 1, s - 1, s - 1);
       }
-      ctx.stroke();
-
-      // Circle at head
-      ctx.fillStyle = this.color;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -58,13 +81,14 @@
   }
 
   function randomWalker(canvas) {
+    const size = 16 + Math.floor(Math.random() * 24);
     return new Walker(canvas, {
       x:      Math.random() * canvas.width,
       y:      Math.random() * canvas.height,
-      size:   4 + Math.random() * 12,
+      size,
       color:  randomColor(),
-      speed:  1 + Math.random() * 3,
-      length: 40 + Math.floor(Math.random() * 80),
+      speed:  4 + Math.random() * 8,
+      length: 20 + Math.floor(Math.random() * 40),
     });
   }
 
@@ -87,15 +111,19 @@
       walkers = Array.from({ length: N }, () => randomWalker(canvas));
     }
 
-    function loop() {
+    let last = null;
+    function loop(ts) {
+      const dt = last === null ? 0 : ts - last;
+      last = ts;
+
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      walkers.forEach(w => { w.update(); w.draw(ctx); });
+      walkers.forEach(w => { w.update(dt); w.draw(ctx); });
       requestAnimationFrame(loop);
     }
 
     resize();
-    loop();
+    requestAnimationFrame(loop);
     new ResizeObserver(resize).observe(container);
   });
 
