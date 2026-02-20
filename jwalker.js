@@ -64,6 +64,7 @@
         this._elapsed -= interval;
         if (!this.step()) {
           this.stopped = true;
+          this.opacity -= FADE_STEP;
           return;
         }
       }
