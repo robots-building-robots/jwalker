@@ -62,6 +62,7 @@
         const moved = this.step();
         if (!moved) {
           this.stopped = true;
+          this.fadeAge = dt; // begin fade immediately with this frame's dt
           return;
         }
       }
