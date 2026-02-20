@@ -5,72 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>jwalker demo</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: system-ui, sans-serif;
-      padding: 2rem;
-      background: #f5f5f5;
-    }
-
-    h1 { margin-bottom: 2rem; }
-
-    .example {
-      margin-bottom: 2rem;
-    }
-
-    .example h2 {
-      margin-bottom: 0.5rem;
-      font-size: 0.85rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: #666;
-    }
-
-    /* The .jwalker container — position is set automatically by the script
-       if not already declared, but explicit here for clarity. */
-    .jwalker {
-      position: relative;
-      width: 100%;
-      height: 240px;
-      background: #fff;
-      border: 1px solid #ddd;
-    }
-
-    /* Content inside the container must layer above the canvas. */
-    .content {
-      position: relative;
-      z-index: 1;
-      padding: 2rem;
-    }
-
-    .content h3 { margin-bottom: 0.5rem; }
-    .content p  { color: #444; line-height: 1.5; }
+    body { margin: 0; font-family: sans-serif; }
+    main { height: 100vh; padding: 2rem; }
+    p { position: relative; }
   </style>
 </head>
 <body>
-
-  <h1>jwalker demo</h1>
-
-  <div class="example">
-    <h2>Container with text content</h2>
-    <div class="jwalker">
-      <div class="content">
-        <h3>Content layers above the canvas</h3>
-        <p>The red X is rendered on a canvas behind this text. Resize the window to see the canvas redraw responsively.</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="example">
-    <h2>Second independent container</h2>
-    <div class="jwalker" style="height: 160px;">
-      <div class="content">
-        <p>Each .jwalker container gets its own independent canvas and ResizeObserver.</p>
-      </div>
-    </div>
-  </div>
-
+  <main class="jwalker">
+    <p>Content sits above the canvas.</p>
+  </main>
   <script src="jwalker.js"></script>
 </body>
 </html>
