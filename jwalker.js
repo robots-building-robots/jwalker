@@ -1,12 +1,12 @@
 document.querySelectorAll('.jwalker').forEach(function (container) {
-  if (getComputedStyle(container).position === 'static') {
-    container.style.position = 'relative';
-  }
+  var style = container.style;
+  if (getComputedStyle(container).position === 'static') style.position = 'relative';
+  style.isolation = 'isolate';
 
   var canvas = document.createElement('canvas');
   canvas.setAttribute('aria-hidden', 'true');
-  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
-  container.appendChild(canvas);
+  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:-1;';
+  container.prepend(canvas);
 
   function draw() {
     canvas.width = container.offsetWidth;
