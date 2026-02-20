@@ -76,16 +76,18 @@
     }
   }
 
+  const GRID_SIZE = 8;
+
   function randomColor() {
-    return `hsl(${Math.random() * 360}, 70%, 55%)`;
+    const l = 40 + Math.floor(Math.random() * 55);
+    return `hsl(0, 0%, ${l}%)`;
   }
 
   function randomWalker(canvas) {
-    const size = 16 + Math.floor(Math.random() * 24);
     return new Walker(canvas, {
       x:      Math.random() * canvas.width,
       y:      Math.random() * canvas.height,
-      size,
+      size:   GRID_SIZE,
       color:  randomColor(),
       speed:  4 + Math.random() * 8,
       length: 20 + Math.floor(Math.random() * 40),
@@ -117,7 +119,8 @@
       last = ts;
 
       const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       walkers.forEach(w => { w.update(dt); w.draw(ctx); });
       requestAnimationFrame(loop);
     }
