@@ -127,12 +127,12 @@
       const dt = last === null ? 0 : ts - last;
       last = ts;
 
-      // Replace dead walkers, maintaining N active
-      const active = walkers.filter(w => w.alive);
-      const stopped = active.filter(w => w.stopped).length;
-      const needed  = N - (active.length - stopped);
-      for (let i = 0; i < needed; i++) active.push(randomWalker(canvas));
-      walkers = active;
+      // Cull fully faded walkers, then spawn to keep N moving
+      const alive   = walkers.filter(w => w.alive);
+      const moving  = alive.filter(w => !w.stopped).length;
+      const needed  = N - moving;
+      for (let i = 0; i < needed; i++) alive.push(randomWalker(canvas));
+      walkers = alive;
 
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
