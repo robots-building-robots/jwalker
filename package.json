@@ -4,7 +4,10 @@
   "description": "Drop-in HTML5 canvas background effect — draws a decorative X behind .jwalker containers",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "build": "esbuild jwalker.js --bundle --minify --outfile=jwalker.min.js"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.27.3"
+  }
 }
