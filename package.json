@@ -1,7 +1,7 @@
 {
   "name": "jwalker",
   "version": "1.0.0",
-  "description": "A minimal JavaScript project",
+  "description": "Drop-in HTML5 canvas background effect — draws a decorative X behind .jwalker containers",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"

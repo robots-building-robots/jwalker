@@ -1,1 +1,1 @@
-console.log('Hello from jwalker!');
+module.exports = require('./jwalker.js');
