@@ -4,25 +4,36 @@
   const GRID_SIZE = 8;
   const FADE_STEP = 0.02;
 
+  function parseColor(str) {
+    const c = document.createElement('canvas').getContext('2d');
+    c.fillStyle = str;
+    const v = c.fillStyle; // browser normalises to #rrggbb or rgba(...)
+    if (v[0] === '#') {
+      const n = parseInt(v.slice(1), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+    return v.match(/\d+/g).slice(0, 3).map(Number);
+  }
+
   class Walker {
-    constructor(canvas, { x, y, color, size, speed, length }) {
+    constructor(canvas, { x, y, lead, tail, size, speed, length }) {
       this.canvas    = canvas;
-      this.color     = color;
+      this.lead      = parseColor(lead);
+      this.tail      = parseColor(tail);
       this.size      = size;
-      this.speed     = speed;
       this.length    = length;
       this.stopped   = false;
       this.opacity   = 0;
       this.col       = Math.floor(x / size);
       this.row       = Math.floor(y / size);
       this.trail     = [{ col: this.col, row: this.row }];
-      this.occupied  = new Set([this.col * 10000 + this.row]); // integer key
+      this.occupied  = new Set([this.col * 10000 + this.row]);
       this._elapsed  = 0;
-      this._interval = 1000 / speed; // computed once
+      this._interval = 1000 / speed;
     }
 
     step() {
-      // Fisher-Yates shuffle of 4 directions, no allocation
+      // Fisher-Yates in-place shuffle
       const d = DIRS;
       for (let i = 3; i > 0; i--) {
         const j = Math.random() * (i + 1) | 0;
@@ -68,12 +79,17 @@
     get alive() { return this.opacity > 0.01; }
 
     draw(ctx) {
-      const n   = this.trail.length;
-      const op  = this.opacity;
-      const s   = this.size;
-      ctx.fillStyle = this.color;
+      const n            = this.trail.length;
+      const op           = this.opacity;
+      const s            = this.size;
+      const [lr, lg, lb] = this.lead;
+      const [tr, tg, tb] = this.tail;
       for (let i = 0; i < n; i++) {
-        ctx.globalAlpha = ((i + 1) / n) * op;
+        const t = (i + 1) / n;
+        const r = (lr - tr) * t + tr | 0;
+        const g = (lg - tg) * t + tg | 0;
+        const b = (lb - tb) * t + tb | 0;
+        ctx.fillStyle = `rgba(${r},${g},${b},${t * op})`;
         const c = this.trail[i];
         ctx.fillRect(c.col * s + 1, c.row * s + 1, s - 1, s - 1);
       }
@@ -84,7 +100,8 @@
     return new Walker(canvas, {
       x:      Math.random() * canvas.width,
       y:      Math.random() * canvas.height,
-      color:  cfg.color,
+      lead:   cfg.lead,
+      tail:   cfg.tail,
       size:   cfg.size,
       speed:  cfg.speed,
       length: cfg.length,
@@ -97,20 +114,22 @@
 
     const d = container.dataset;
     const cfg = {
-      color:  d.color  || 'rgb(160,160,160)',
+      lead:   d.color    || '#a0a0a0',
+      tail:   d.colorEnd || '#000000',
       size:   d.size   ? parseInt(d.size,  10) : GRID_SIZE,
-      count:  d.count  ? parseInt(d.count, 10) : 3,
+      count:  d.count  ? parseInt(d.count, 10) : null,
       speed:  d.speed  ? parseFloat(d.speed)   : 4 + Math.random() * 8,
       length: d.length ? parseInt(d.length, 10) : 20 + Math.floor(Math.random() * 40),
     };
 
     const canvas = document.createElement('canvas');
     canvas.setAttribute('aria-hidden', 'true');
-    canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:-1;';
+    canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:-1;';
     container.prepend(canvas);
 
     const ctx = canvas.getContext('2d');
-    const N = cfg.count;
+    const MAX = 8;
+    let n = 0;
     let walkers = [];
     let needsReset = true;
     let resizeTimer = null;
@@ -120,6 +139,22 @@
       resizeTimer = setTimeout(function () { needsReset = true; }, 150);
     }).observe(container);
 
+    container.addEventListener('click', function (e) {
+      const rect = container.getBoundingClientRect();
+      const w = new Walker(canvas, {
+        x:      e.clientX - rect.left,
+        y:      e.clientY - rect.top,
+        lead:   cfg.lead,
+        tail:   cfg.tail,
+        size:   cfg.size,
+        speed:  cfg.speed,
+        length: cfg.length,
+      });
+      w.opacity = 1;
+      if (walkers.length >= MAX) walkers.shift();
+      walkers.push(w);
+    });
+
     let last = null;
     function loop(ts) {
       const dt = last === null ? 0 : ts - last;
@@ -127,26 +162,26 @@
 
       if (needsReset) {
         needsReset = false;
-        canvas.width  = container.offsetWidth;
-        canvas.height = container.offsetHeight;
-        walkers = Array.from({ length: N }, function () { return spawnWalker(canvas, cfg); });
+        const desktop = cfg.count ?? 3;
+        n = window.innerWidth < 768 ? Math.ceil(desktop / 2) : desktop;
+        canvas.width  = window.innerWidth;
+        canvas.height = window.innerHeight;
+        walkers = Array.from({ length: n }, function () { return spawnWalker(canvas, cfg); });
       }
 
-      // In-place cull and refill — no allocation when steady-state
       let alive = 0;
       for (let i = 0; i < walkers.length; i++) {
         if (walkers[i].alive) walkers[alive++] = walkers[i];
       }
       walkers.length = alive;
-      while (walkers.length < N) walkers.push(spawnWalker(canvas, cfg));
+      while (walkers.length < n) walkers.push(spawnWalker(canvas, cfg));
+      if (walkers.length > MAX) walkers.splice(0, walkers.length - MAX);
 
-      ctx.globalAlpha = 1;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       for (let i = 0; i < walkers.length; i++) {
         walkers[i].update(dt);
         walkers[i].draw(ctx);
       }
-      ctx.globalAlpha = 1;
 
       requestAnimationFrame(loop);
     }

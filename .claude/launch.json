@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "jwalker-demo",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-p", "4321", "."],
+      "port": 4321
+    }
+  ],
+  "autoVerify": false
+}
